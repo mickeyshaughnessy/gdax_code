@@ -1,0 +1,6 @@
+key = "your key" 
+passphrase = "your passphrase"
+secret = "your secret"
+ETH_ACCT = "your ETH account"
+USD_ACCT = "your USD account"
+base_url = "https://api.gdax.com"
