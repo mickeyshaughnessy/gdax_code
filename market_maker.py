@@ -6,7 +6,7 @@ import json
 def get_position(product='ETH', auth=None):
     r = requests.get(base_url + '/position/', auth=auth) 
     resp = r.json()
-    return float(resp['accounts'][product].get(hold))
+    return float(resp['accounts'][product].get('hold'))
 
 def cancel_all(auth=None):
     r = requests.delete(base_url + '/orders', auth=auth)
