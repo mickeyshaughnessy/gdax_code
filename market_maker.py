@@ -2,6 +2,7 @@
 import requests
 from config import *
 import json
+import sys
 
 def get_position(product='ETH', auth=None):
     r = requests.get(base_url + '/position/', auth=auth) 
@@ -30,23 +31,29 @@ def get_bid_ask(product='ETH-USD'):
     return bid, ask
     
 
-def make_market():
+def make_market(product='ETH-USD'):
+    A = product.split('-')[0]
+    B = product.split('-')[1]
     auth = GdaxAuth(key, secret, passphrase)
     while True:
         sleep(1)
-        eth_pos = get_position(product='ETH', auth=auth)
-        usd_pos = get_position(product='USD', auth=auth)
-        bid, ask = get_bid_ask()
-        print 'ETH_pos = %s, USD_pos = %s, bid/ask = %s - %s' % (eth_pos, usd_pos, bid, ask)
-        if eth_pos < 0.1 and usd_pos < 50: # ETH / USD
-            make_limit(side='buy', size = 0.01, price=0.99*bid) 
-            make_limit(side='sell', size = 0.01, price=1.01*bid) 
-        elif eth_pos < 0.1:
-            make_limit(side='buy', size = 0.01, price=0.99*bid)
-        elif usd_pos < 50:
-            make_limit(side='sell', size = 0.01, price=1.01*bid)
+        A_pos = get_position(product=A, auth=auth)
+        B_pos = get_position(product=B, auth=auth)
+        bid, ask = get_bid_ask(product)
+        print '%s_pos = %s, %s_pos = %s, bid/ask = %s - %s' % (A, A_pos, B, B_pos, bid, ask)
+        if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
+            make_limit(side='buy', size = 0.01, price=0.99*bid, product=product) 
+            make_limit(side='sell', size = 0.01, price=1.01*bid, product=product) 
+        elif A_pos < risk_limits[A]:
+            make_limit(side='buy', size = 0.01, price=0.99*bid, product=product)
+        elif B_pos < risk_limits[B]:
+            make_limit(side='sell', size = 0.01, price=1.01*bid, product=product)
         else:
             cancel_all()
 
 if __name__ == "__main__":
-    make_market() 
+    if len(sys.argv) > 1:
+        product = sys.argv[1]
+    else:
+        product = 'ETH-USD'
+    make_market(product=product) 
