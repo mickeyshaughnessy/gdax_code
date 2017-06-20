@@ -3,9 +3,9 @@ import requests
 from config import *
 import json
 
-def get_position():
-    # return the total outstanding risk
-    return 0.0
+def get_position(auth=None):
+    r = requests.get(base_url + '/position/', auth=auth) 
+    return r.json() 
 
 def cancel_all(auth=None):
     r = requests.delete(base_url + '/orders', auth=auth)
