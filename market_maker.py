@@ -12,6 +12,7 @@ def cancel_all(auth=None):
     r = requests.delete(base_url + '/orders', auth=auth)
 
 def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
+    price = (int(price * 100))/100.0 # GDAX API only takes two decimal places on prices, apparently.
     order = json.dumps({
             'side' : side,
             'product_id' : product,
