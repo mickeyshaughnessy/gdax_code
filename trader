@@ -1,0 +1,44 @@
+#!/usr/bin/python2.7
+import fire
+import unittest
+from services.http import GDAX
+from models.constants import *
+from models.coins import USD, BTC, LTC, ETH
+from time import sleep
+
+TRANSACTION_RATE_PCT = 0.003
+TRANSACTION_RATE_PCT_ETH = 0.003
+
+class CLICommands(object):
+
+    def simulate(self):
+
+        usd_amt = 1
+        while True:
+            sleep(1)
+            links = [
+                USD(quantity=usd_amt).to(LTC).to(BTC).to(USD),
+                USD(quantity=usd_amt).to(BTC).to(LTC).to(USD),
+                USD(quantity=usd_amt).to(ETH).to(BTC).to(USD),
+                USD(quantity=usd_amt).to(BTC).to(ETH).to(USD),
+            ]
+
+            gains = map(lambda d: d.quantity - (TRANSACTION_RATE_PCT * usd_amt * 3.), links)
+            best = max(gains)
+
+            gain_pct = map(lambda d: str((d-usd_amt) / usd_amt * 100) + '%', gains)
+            print(gain_pct)
+
+            if best > usd_amt:
+                    usd_amt = best
+                    print("USD AMT: %s" % (usd_amt))
+
+
+
+    def test(self):
+        suite = unittest.TestLoader().discover("./tests")
+        unittest.TextTestRunner(verbosity=4).run(suite)
+
+
+if __name__ == "__main__":
+    fire.Fire(CLICommands, name="trader")

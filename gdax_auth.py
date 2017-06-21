@@ -31,6 +31,6 @@ class GdaxAuth(AuthBase):
 
 
 if __name__ == "__main__":
-	auth = GdaxAuth(key, secret, passphrase)
-	r = requests.get(url + '/accounts/' + ETH_ACCT, auth=auth)
-	print r.json()
+    auth = GdaxAuth(key, secret, passphrase)
+    r = requests.get(GDAX_BASE_URL + '/accounts/' + ETH_ACCT, auth=auth)
+    print r.json()
