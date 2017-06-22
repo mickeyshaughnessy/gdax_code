@@ -50,7 +50,7 @@ def make_market(product='ETH-USD', auth=None):
         buy_price = (1 - margin + random.random()*noise) * bid
         sell_price = (1 + margin + random.random()*noise) * ask 
         print '%s_pos = %s, %s_pos = %s, bid/ask = %s - %s, spread = %s, mySpread = %s' % (
-            A, A_pos, B, B_pos, bid, ask, ask-bid, sell_price - bid_price
+            A, A_pos, B, B_pos, bid, ask, ask-bid, sell_price - buy_price
         )
         if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
             make_limit(side='buy', size = 0.01, price=buy_price, product=product, auth=auth) 
