@@ -26,7 +26,7 @@ def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
             'price' : price 
             })
     r = requests.post(base_url + '/orders', data=order, auth=auth)
-    print 'submitted order to %s %s %s at %s' % (side, size, product, price)
+    print 'submitted order to %s %s %s at %s %s' % (side, size, product.split('-')[0], price, product.split('-')[1])
     return r.json()
 
 def get_bid_ask(product='ETH-USD'):
@@ -40,7 +40,7 @@ def get_bid_ask(product='ETH-USD'):
 def make_market(product='ETH-USD', auth=None):
     A = product.split('-')[0]
     B = product.split('-')[1]
-    margin = 0.002
+    margin = 0.001
     noise = 0.001
     while True:
         sleep(5)
@@ -49,7 +49,7 @@ def make_market(product='ETH-USD', auth=None):
         bid, ask = get_bid_ask(product)
         buy_price = (1 - margin + random.random()*noise) * bid
         sell_price = (1 + margin + random.random()*noise) * ask 
-        print '%s_pos = %s, %s_pos = %s, bid/ask = %s - %s, spread = %s, mySpread = %s' % (
+        print '%s_at_risk = %s, %s_at_risk = %s, bid/ask = %s - %s, spread = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, bid, ask, ask-bid, sell_price - buy_price
         )
         if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
