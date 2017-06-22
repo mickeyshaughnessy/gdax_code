@@ -4,7 +4,7 @@ from gdax_auth import GdaxAuth
 import json
 import pprint
 import sys
-from market_maker import make_limit, cancel_all
+from market_maker import make_limit, cancel_all, get_position
 import time
 
 def get_safe_sell(auth=None):
@@ -31,10 +31,12 @@ if __name__ == "__main__":
         r = requests.get(base_url + '/orders', auth=auth)
         print 'Orders:'
         pprint.pprint(r.json())
+        print 'ETH position: %s' % get_position(product='ETH', auth=auth)
         cancel_all(auth=auth)
         time.sleep(5)
         r = requests.get(base_url + '/orders', auth=auth)
         print 'Orders:'
         pprint.pprint(r.json())
+        print 'ETH position: %s' % get_position(product='ETH', auth=auth)
     else:
         sys.exit()
