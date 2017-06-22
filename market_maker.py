@@ -40,27 +40,31 @@ def get_bid_ask(product='ETH-USD'):
 def make_market(product='ETH-USD', auth=None):
     A = product.split('-')[0]
     B = product.split('-')[1]
-    margin = 0.001
-    noise = 0.001
+    spread_factor = 1.5 # How big to make mySpread relative to the market
+    noise = 0.1 # noisy additional spread
+    _size = 0.05 # how big to make the orders 
     while True:
         sleep(5)
         A_pos = get_position(product=A, auth=auth)
         B_pos = get_position(product=B, auth=auth)
         bid, ask = get_bid_ask(product)
-        buy_price = (1 - margin + random.random()*noise) * bid
-        sell_price = (1 + margin + random.random()*noise) * ask 
+        market_spread = ask - bid
+        buy_price = bid - 0.5 * market_spread * (spread_factor + noise * random.random())
+        sell_price = ask + 0.5 * market_spread * (spread_factor + noise * random.random())
         print '%s_at_risk = %s, %s_at_risk = %s, bid/ask = %s - %s, spread = %s, mySpread = %s' % (
-            A, A_pos, B, B_pos, bid, ask, ask-bid, sell_price - buy_price
+            A, A_pos, B, B_pos, bid, ask, market_spread, sell_price - buy_price
         )
-        if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
-            make_limit(side='buy', size = 0.01, price=buy_price, product=product, auth=auth) 
-            make_limit(side='sell', size = 0.01, price=sell_price, product=product, auth=auth) 
+        if random.random() < 0.005:
+            cancel_all(auth=auth)
+        elif A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
+            make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth) 
+            make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth) 
         elif B_pos < risk_limits[B]:
-            make_limit(side='buy', size = 0.01, price=buy_price, product=product, auth=auth)
+            make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth)
         elif A_pos < risk_limits[A]:
-            make_limit(side='sell', size = 0.01, price=sell_price, product=product, auth=auth)
+            make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth)
         else:
-            cancel_all()
+            cancel_all(auth=auth)
 
 if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
