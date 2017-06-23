@@ -13,6 +13,11 @@ def get_position(product='ETH', auth=None):
     resp = r.json()
     return float(resp['accounts'][product].get('hold'))
 
+def cancel_product(product='ETH-USD', auth=None):
+    o = requests.get(base_url + '/orders?product_id=%s' % product, auth=auth)
+    for order in o.json():
+        r = requests.delete(base_url + '/orders/%s' % order['id'], auth=auth)
+
 def cancel_all(auth=None):
     r = requests.delete(base_url + '/orders', auth=auth)
     return r.json()
@@ -36,27 +41,30 @@ def get_bid_ask(product='ETH-USD'):
     ask = float(resp['asks'][0][0])
     return bid, ask
 
- 
+def get_buy_sell(product='ETH-USD'):
+    spread_factor = 1.8 # How big to make mySpread relative to the market
+    noise = 0.1 # noisy additional spread
+    gdax_bid, gdax_ask = get_bid_ask(product=product)
+    gdax_spread = gdax_ask - gdax_bid
+    buy_price = gdax_bid - 0.5 * gdax_spread * (spread_factor + noise * random.random())
+    sell_price = gdax_ask + 0.5 * gdax_spread * (spread_factor + noise * random.random())
+    return (buy_price, sell_price)
+
 def make_market(product='ETH-USD', auth=None):
     A = product.split('-')[0]
     B = product.split('-')[1]
-    spread_factor = 1.5 # How big to make mySpread relative to the market
-    noise = 0.1 # noisy additional spread
-    _size = 0.05 # how big to make the orders 
+    _size = 0.50 # how big to make the orders 
     while True:
-        sleep(5)
+        sleep(3)
+        cancel_product(product=product, auth=auth)
+        sleep(2)
         A_pos = get_position(product=A, auth=auth)
         B_pos = get_position(product=B, auth=auth)
-        bid, ask = get_bid_ask(product)
-        market_spread = ask - bid
-        buy_price = bid - 0.5 * market_spread * (spread_factor + noise * random.random())
-        sell_price = ask + 0.5 * market_spread * (spread_factor + noise * random.random())
-        print '%s_at_risk = %s, %s_at_risk = %s, bid/ask = %s - %s, spread = %s, mySpread = %s' % (
-            A, A_pos, B, B_pos, bid, ask, market_spread, sell_price - buy_price
+        buy_price, sell_price = get_buy_sell(product=product)
+        print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
+            A, A_pos, B, B_pos, sell_price - buy_price
         )
-        if random.random() < 0.005:
-            cancel_all(auth=auth)
-        elif A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
+        if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
             make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth) 
             make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth) 
         elif B_pos < risk_limits[B]:
@@ -68,8 +76,5 @@ def make_market(product='ETH-USD', auth=None):
 
 if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
-    if len(sys.argv) > 1:
-        product = sys.argv[1]
-    else:
-        product = 'ETH-USD'
+    product = sys.argv[1]
     make_market(product=product,auth=auth) 
