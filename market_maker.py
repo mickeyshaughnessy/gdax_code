@@ -53,10 +53,10 @@ def get_buy_sell(product='ETH-USD'):
 def make_market(product='ETH-USD', auth=None):
     A = product.split('-')[0]
     B = product.split('-')[1]
-    _size = 0.50 # how big to make the orders 
+    _size = 0.25 # how big to make the orders 
     while True:
         sleep(3)
-        cancel_product(product=product, auth=auth)
+        cancel_product(live_buys, live_sells, product=product, auth=auth)
         sleep(2)
         A_pos = get_position(product=A, auth=auth)
         B_pos = get_position(product=B, auth=auth)
@@ -65,14 +65,26 @@ def make_market(product='ETH-USD', auth=None):
             A, A_pos, B, B_pos, sell_price - buy_price
         )
         if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
-            make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth) 
-            make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth) 
+            buy = make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth) 
+            sell = make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth) 
         elif B_pos < risk_limits[B]:
-            make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth)
+            buy = make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth)
+            sell = None
         elif A_pos < risk_limits[A]:
-            make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth)
+            sell = make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth)
+            buy = None
         else:
             cancel_all(auth=auth)
+        if buy:
+            if buy.get('message'):
+                print buy.get('message')
+            else:
+                live_buys.append(buy.get('id'))
+        if sell:
+            if sell.get('message'):
+                print sell.get('message')
+            else:
+                live_sells.append(sell.get('id'))
 
 if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
