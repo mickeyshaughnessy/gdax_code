@@ -14,18 +14,23 @@ def get_usd_ex(currency):
 
 def get_total_balance(auth=None):
     resp = get_accounts(auth=auth)
-    balance = 0
+    balance, balances = 0, {} 
     for acct in resp:
-        if acct.get('currency') == 'USD':
+        _balance = float(acct.get('balance'))
+        _currency = acct.get('currency') 
+        if _currency == 'USD':
             usd_ex = 1.0
         else:
-            usd_ex = get_usd_ex(acct.get('currency'))
-        balance += usd_ex * float(acct.get('balance'))
-    return balance
+            usd_ex = get_usd_ex(_currency)
+        balance += usd_ex * _balance
+        balances[_currency] = _balance
+    return balance, balances
 
 if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
     resp = get_accounts(auth=auth)
     for acct in resp:
         print 'type: %s, balance: %s, hold: %s, available: %s' % (acct.get('currency'), acct.get('balance'), acct.get('hold'), acct.get('available'))
-    print 'Total value is: %s' % get_total_balance(auth=auth)
+    total_value, balances = get_total_balance(auth=auth)
+    print 'Total value is: %s' % total_value
+    print 'Balances: %s' % balances

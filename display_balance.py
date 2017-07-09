@@ -10,8 +10,9 @@ if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
     while True:
         with open('balances.dat', 'a') as f:
-            balance = get_total_balance(auth=auth)
+            balance, balances = get_total_balance(auth=auth)
             ts = (dt.now() - epoch).total_seconds() 
-            print 'Total balance ($): %s' % get_total_balance(auth=auth)
+            print 'Total balance ($): %s' % balance 
+            print 'Balances : %s' % balances 
             f.write('%s %s\n' % (balance, ts))
             sleep(5)

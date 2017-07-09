@@ -7,6 +7,7 @@ from gdax_auth import GdaxAuth
 from time import sleep
 from pprint import pprint
 import random
+import argparse
 
 def get_position(product='ETH', auth=None):
     r = requests.get(base_url + '/position/', auth=auth) 
@@ -16,7 +17,7 @@ def get_position(product='ETH', auth=None):
 def cancel_product(product='ETH-USD', auth=None):
     o = requests.get(base_url + '/orders?product_id=%s' % product, auth=auth)
     for order in o.json():
-        r = requests.delete(base_url + '/orders/%s' % order['id'], auth=auth)
+        r = requests.delete(base_url + '/orders/%s' % order.get('id'), auth=auth)
 
 def cancel_all(auth=None):
     r = requests.delete(base_url + '/orders', auth=auth)
@@ -41,40 +42,41 @@ def get_bid_ask(product='ETH-USD'):
     ask = float(resp['asks'][0][0])
     return bid, ask
 
-def get_buy_sell(product='ETH-USD'):
-    spread_factor = 1.8 # How big to make mySpread relative to the market
-    noise = 0.1 # noisy additional spread
+def get_buy_sell(product='ETH-USD', spread_factor=1.8, noise=0.1):
+    # spread_factor: How big to make mySpread relative to the market
+    # noise: noisy additional spread
     gdax_bid, gdax_ask = get_bid_ask(product=product)
     gdax_spread = gdax_ask - gdax_bid
+    # here, get other exchange bid/ask prices to determine "fair" value
     buy_price = gdax_bid - 0.5 * gdax_spread * (spread_factor + noise * random.random())
     sell_price = gdax_ask + 0.5 * gdax_spread * (spread_factor + noise * random.random())
     return (buy_price, sell_price)
 
-def make_market(product='ETH-USD', auth=None):
-    A = product.split('-')[0]
-    B = product.split('-')[1]
-    _size = 0.25 # how big to make the orders 
+def make_market(product='ETH-USD', auth=None, order_size=0.25):
+    cancel_all(auth=auth)
+    (A, B) = product.split('-')[-2:]
+    live_buys, live_sells = [], []
     while True:
-        sleep(3)
-        cancel_product(live_buys, live_sells, product=product, auth=auth)
-        sleep(2)
-        A_pos = get_position(product=A, auth=auth)
-        B_pos = get_position(product=B, auth=auth)
+        sleep(4)
+        A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
+        if random.random() < 0.02: cancel_product(auth=auth)
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, sell_price - buy_price
         )
         if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
-            buy = make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth) 
-            sell = make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth) 
+            buy = make_limit(side='buy', size=order_size, price=buy_price, product=product, auth=auth) 
+            sell = make_limit(side='sell', size=order_size, price=sell_price, product=product, auth=auth) 
         elif B_pos < risk_limits[B]:
-            buy = make_limit(side='buy', size=_size, price=buy_price, product=product, auth=auth)
+            buy = make_limit(side='buy', size=order_size, price=buy_price, product=product, auth=auth)
             sell = None
         elif A_pos < risk_limits[A]:
-            sell = make_limit(side='sell', size=_size, price=sell_price, product=product, auth=auth)
+            sell = make_limit(side='sell', size=order_size, price=sell_price, product=product, auth=auth)
             buy = None
         else:
-            cancel_all(auth=auth)
+            cancel_product(product=product, auth=auth)
+            live_buys, live_sells = [], []
+        
         if buy:
             if buy.get('message'):
                 print buy.get('message')
@@ -87,6 +89,9 @@ def make_market(product='ETH-USD', auth=None):
                 live_sells.append(sell.get('id'))
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--product', type=str, default='ETH-USD', help='THE CURRENCY PAIR!')
+    parser.add_argument('-s', '--size', type=float, default=0.1, help='crypto side order size')
+    args = parser.parse_args()
     auth = GdaxAuth(key, secret, passphrase)
-    product = sys.argv[1]
-    make_market(product=product,auth=auth) 
+    make_market(product=args.product, auth=auth, order_size=args.size) 
