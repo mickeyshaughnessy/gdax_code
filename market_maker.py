@@ -42,7 +42,7 @@ def get_bid_ask(product='ETH-USD'):
     ask = float(resp['asks'][0][0])
     return bid, ask
 
-def get_buy_sell(product='ETH-USD', spread_factor=1.8, noise=0.1):
+def get_buy_sell(product='ETH-USD', spread_factor=5.8, noise=0.1):
     # spread_factor: How big to make mySpread relative to the market
     # noise: noisy additional spread
     gdax_bid, gdax_ask = get_bid_ask(product=product)
