@@ -83,7 +83,7 @@ def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_
         print 'change in %s: %s, change in %s: %s, total_earnings: %s' % (A, balances[A] * start_ex - start_A, B, balances[B] - start_B, balances[A] * start_ex  - start_A + balances[B] - start_B)
         sleep(4)
         A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
-        if random.random() < 0.02: cancel_product(auth=auth)
+        if random.random() < 0.08: cancel_product(auth=auth)
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, sell_price - buy_price 
