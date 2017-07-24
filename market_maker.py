@@ -39,6 +39,7 @@ def cancel_all(auth=None):
 
 def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
     price = (int(price * 100))/100.0 # GDAX API only takes two decimal places on prices, apparently.
+    size = (int(size * 100))/100.0 # GDAX API only takes two decimal places on sizes, too.
     order = json.dumps({
             'side' : side,
             'product_id' : product,
@@ -82,24 +83,24 @@ def rebalance(auth=None, product='LTC-USD'):
     condition, strong, weak, ex = is_unbalanced(auth=auth, product=product) 
     while condition:
         cancel_all(auth=auth)
-        bid, ask = get_bid_ask(product)
+        buy, sell = get_buy_sell(product)
         if 'USD' in strong.keys():
-            make_limit(
+            order = make_limit(
                 side='buy',
-                price=0.98*bid, 
+                price=buy,
                 size=0.5*strong.get('USD')/ex, 
                 product=product, 
                 auth=auth
             ) 
         else:
-            make_limit(
+            order = make_limit(
                 side='sell',
-                price=1.02*ask, 
+                price=sell,
                 size=0.5*strong.values()[0], 
                 product=product, 
                 auth=auth
             )
-        print 'submitted rebalancing order' 
+        print 'submitted rebalancing order: %s' % order.get('message') 
         sleep(20)
         condition, strong, weak, ex = is_unbalanced(auth=auth, product=product)
         
@@ -113,7 +114,7 @@ def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_
         sleep(4)
         A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
         if random.random() < 0.08: cancel_product(auth=auth)
-        if random.random() < 0.2: rebalance(auth=auth, product=product)
+        if random.random() < 0.2: rebalance(auth=auth, product=product, )
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, sell_price - buy_price 
