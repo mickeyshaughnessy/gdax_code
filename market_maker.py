@@ -1,26 +1,18 @@
 # This script buys low and sells high
-import requests
+import requests, json, sys, random, argparse
 from config import *
-import json
-import sys
 from gdax_auth import GdaxAuth
 from time import sleep
 from pprint import pprint
-import random
-import argparse
-
-def get_accounts(auth=None):
-    r = requests.get(base_url + '/accounts', auth=auth)
-    return r.json()
 
 def get_usd_ex(currency):
     bid, ask = get_bid_ask(product='%s-USD' % currency)
     return 0.5 * (bid + ask)
 
 def get_total_balance(auth=None):
-    resp = get_accounts(auth=auth)
+    resp = requests.get(base_url + '/accounts', auth=auth) 
     balance, balances = 0, {}
-    for acct in resp:
+    for acct in resp.json():
         _balance = float(acct.get('balance'))
         _currency = acct.get('currency')
         if _currency == 'USD':
@@ -58,10 +50,9 @@ def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
     return r.json()
 
 def get_bid_ask(product='ETH-USD'):
-    r = requests.get(base_url + '/products/%s/book' % product)
-    resp = r.json()
-    bid = float(resp['bids'][0][0])
-    ask = float(resp['asks'][0][0])
+    resp = requests.get(base_url + '/products/%s/book' % product)
+    bid = float(resp.json()['bids'][0][0])
+    ask = float(resp.json()['asks'][0][0])
     return bid, ask
 
 def get_buy_sell(product='ETH-USD', spread_factor=5.8, noise=0.1):
@@ -74,6 +65,44 @@ def get_buy_sell(product='ETH-USD', spread_factor=5.8, noise=0.1):
     sell_price = gdax_ask + 0.5 * gdax_spread * (spread_factor + noise * random.random())
     return (buy_price, sell_price)
 
+def is_unbalanced(auth=None, product='LTC-USD'):
+    currency = product.split('-')[0]
+    ex = get_usd_ex(currency)
+    _, balances = get_total_balance(auth=auth)
+    A_bal, B_bal = balances.get(currency, 0.0), balances.get('USD', 0.0)
+    A_val = A_bal * ex
+    if A_val < 0.2 * B_bal:
+        return True, {'USD':B_bal}, {currency:A_bal}, ex
+    elif A_val > 5 * B_bal:
+        return True, {currency:A_bal}, {'USD':B_bal}, ex
+    else:
+        return False, {}, {}, ex
+
+def rebalance(auth=None, product='LTC-USD'):
+    condition, strong, weak, ex = is_unbalanced(auth=auth, product=product) 
+    while condition:
+        cancel_all(auth=auth)
+        bid, ask = get_bid_ask(product)
+        if 'USD' in strong.keys():
+            make_limit(
+                side='buy',
+                price=0.98*bid, 
+                size=0.5*strong.get('USD')/ex, 
+                product=product, 
+                auth=auth
+            ) 
+        else:
+            make_limit(
+                side='sell',
+                price=1.02*ask, 
+                size=0.5*strong.values()[0], 
+                product=product, 
+                auth=auth
+            )
+        print 'submitted rebalancing order' 
+        sleep(20)
+        condition, strong, weak, ex = is_unbalanced(auth=auth, product=product)
+        
 def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_B=0, start_ex=0):
     cancel_all(auth=auth)
     (A, B) = product.split('-')[-2:]
@@ -84,6 +113,7 @@ def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_
         sleep(4)
         A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
         if random.random() < 0.08: cancel_product(auth=auth)
+        if random.random() < 0.2: rebalance(auth=auth, product=product)
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, sell_price - buy_price 
