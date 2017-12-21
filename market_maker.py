@@ -1,13 +1,27 @@
 # This script buys low and sells high
-import requests
+import requests, json, sys, random, argparse
 from config import *
-import json
-import sys
 from gdax_auth import GdaxAuth
 from time import sleep
 from pprint import pprint
-import random
-import argparse
+
+def get_usd_ex(currency):
+    bid, ask = get_bid_ask(product='%s-USD' % currency)
+    return 0.5 * (bid + ask)
+
+def get_total_balance(auth=None):
+    resp = requests.get(base_url + '/accounts', auth=auth) 
+    balance, balances = 0, {}
+    for acct in resp.json():
+        _balance = float(acct.get('balance'))
+        _currency = acct.get('currency')
+        if _currency == 'USD':
+            usd_ex = 1.0
+        else:
+            usd_ex = get_usd_ex(_currency)
+        balance += usd_ex * _balance
+        balances[_currency] = _balance
+    return balance, balances
 
 def get_position(product='ETH', auth=None):
     r = requests.get(base_url + '/position/', auth=auth) 
@@ -25,6 +39,7 @@ def cancel_all(auth=None):
 
 def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
     price = (int(price * 100))/100.0 # GDAX API only takes two decimal places on prices, apparently.
+    size = (int(size * 100))/100.0 # GDAX API only takes two decimal places on sizes, too.
     order = json.dumps({
             'side' : side,
             'product_id' : product,
@@ -36,33 +51,72 @@ def make_limit(side='buy', size=0.0, price=0.0, product='ETH-USD', auth=None):
     return r.json()
 
 def get_bid_ask(product='ETH-USD'):
-    r = requests.get(base_url + '/products/%s/book' % product)
-    resp = r.json()
-    bid = float(resp['bids'][0][0])
-    ask = float(resp['asks'][0][0])
+    resp = requests.get(base_url + '/products/%s/book' % product)
+    bid = float(resp.json()['bids'][0][0])
+    ask = float(resp.json()['asks'][0][0])
     return bid, ask
 
-def get_buy_sell(product='ETH-USD', spread_factor=2.8, noise=0.1):
+def get_buy_sell(product='ETH-USD', spread_factor=5.8, noise=0.1):
     # spread_factor: How big to make mySpread relative to the market
     # noise: noisy additional spread
     gdax_bid, gdax_ask = get_bid_ask(product=product)
     gdax_spread = gdax_ask - gdax_bid
-    # here, get other exchange bid/ask prices to determine "fair" value
     buy_price = gdax_bid - 0.5 * gdax_spread * (spread_factor + noise * random.random())
     sell_price = gdax_ask + 0.5 * gdax_spread * (spread_factor + noise * random.random())
     return (buy_price, sell_price)
 
-def make_market(product='ETH-USD', auth=None, order_size=0.25):
+def is_unbalanced(auth=None, product='LTC-USD'):
+    currency = product.split('-')[0]
+    ex = get_usd_ex(currency)
+    _, balances = get_total_balance(auth=auth)
+    A_bal, B_bal = balances.get(currency, 0.0), balances.get('USD', 0.0)
+    A_val = A_bal * ex
+    if A_val < 0.2 * B_bal:
+        return True, {'USD':B_bal}, {currency:A_bal}, ex
+    elif A_val > 5 * B_bal:
+        return True, {currency:A_bal}, {'USD':B_bal}, ex
+    else:
+        return False, {}, {}, ex
+
+def rebalance(auth=None, product='LTC-USD'):
+    condition, strong, weak, ex = is_unbalanced(auth=auth, product=product) 
+    while condition:
+        cancel_all(auth=auth)
+        buy, sell = get_buy_sell(product)
+        if 'USD' in strong.keys():
+            order = make_limit(
+                side='buy',
+                price=buy,
+                size=0.5*strong.get('USD')/ex, 
+                product=product, 
+                auth=auth
+            ) 
+        else:
+            order = make_limit(
+                side='sell',
+                price=sell,
+                size=0.5*strong.values()[0], 
+                product=product, 
+                auth=auth
+            )
+        print 'submitted rebalancing order: %s' % order.get('message') 
+        sleep(20)
+        condition, strong, weak, ex = is_unbalanced(auth=auth, product=product)
+        
+def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_B=0, start_ex=0):
     cancel_all(auth=auth)
     (A, B) = product.split('-')[-2:]
     live_buys, live_sells = [], []
     while True:
+        _, balances = get_total_balance(auth=auth)
+        print 'change in %s: %s, change in %s: %s, total_earnings: %s' % (A, balances[A] * start_ex - start_A, B, balances[B] - start_B, balances[A] * start_ex  - start_A + balances[B] - start_B)
         sleep(4)
         A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
-        if random.random() < 0.02: cancel_product(auth=auth)
+        if random.random() < 0.08: cancel_product(product=product, auth=auth)
+        if random.random() < 0.2: rebalance(auth=auth, product=product, )
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
-            A, A_pos, B, B_pos, sell_price - buy_price
+            A, A_pos, B, B_pos, sell_price - buy_price 
         )
         if A_pos < risk_limits[A] and B_pos < risk_limits[B]: 
             buy = make_limit(side='buy', size=order_size, price=buy_price, product=product, auth=auth) 
@@ -94,4 +148,8 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--size', type=float, default=0.1, help='crypto side order size')
     args = parser.parse_args()
     auth = GdaxAuth(key, secret, passphrase)
-    make_market(product=args.product, auth=auth, order_size=args.size) 
+    (A, B) = args.product.split('-')[-2:]
+    _, balances = get_total_balance(auth=auth)
+    start_ex = get_usd_ex(A)
+    start_value_A, start_value_B = balances[A] * start_ex, balances[B] 
+    make_market(product=args.product, auth=auth, order_size=args.size, start_A=start_value_A, start_B=start_value_B, start_ex=start_ex) 
