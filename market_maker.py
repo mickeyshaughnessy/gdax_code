@@ -6,6 +6,7 @@ from time import sleep
 from pprint import pprint
 
 def get_usd_ex(currency):
+    if currency == 'USD': return 1.0
     bid, ask = get_bid_ask(product='%s-USD' % currency)
     return 0.5 * (bid + ask)
 
@@ -13,20 +14,27 @@ def get_total_balance(auth=None):
     resp = requests.get(base_url + '/accounts', auth=auth) 
     balance, balances = 0, {}
     for acct in resp.json():
-        _balance = float(acct.get('balance'))
+        _balance = float(acct.get('balance', 0.0))
         _currency = acct.get('currency')
-        if _currency == 'USD':
-            usd_ex = 1.0
-        else:
+        if _balance > 0.0:
             usd_ex = get_usd_ex(_currency)
-        balance += usd_ex * _balance
-        balances[_currency] = _balance
+            balance += usd_ex * _balance
+            balances[_currency] = _balance
     return balance, balances
 
 def get_position(product='ETH', auth=None):
-    r = requests.get(base_url + '/position/', auth=auth) 
+    #r = requests.get(base_url + '/postions/', auth=auth) 
+    r = requests.get(base_url + '/accounts/', auth=auth) 
     resp = r.json()
-    return float(resp['accounts'][product].get('hold'))
+    target = {}
+    for c in resp:
+        if c.get('currency') == product:
+            target = c
+    #print 'position: %s' % target
+    if target:
+        return float(target.get('hold', 0.0))
+    else:
+        return target
 
 def cancel_product(product='ETH-USD', auth=None):
     o = requests.get(base_url + '/orders?product_id=%s' % product, auth=auth)
@@ -128,6 +136,7 @@ def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_
             sell = make_limit(side='sell', size=order_size, price=sell_price, product=product, auth=auth)
             buy = None
         else:
+            buy, sell = None, None
             cancel_product(product=product, auth=auth)
             live_buys, live_sells = [], []
         
@@ -150,6 +159,8 @@ if __name__ == "__main__":
     auth = GdaxAuth(key, secret, passphrase)
     (A, B) = args.product.split('-')[-2:]
     _, balances = get_total_balance(auth=auth)
+    print "Balances: %s" % balances
+    raw_input()
     start_ex = get_usd_ex(A)
     start_value_A, start_value_B = balances[A] * start_ex, balances[B] 
     make_market(product=args.product, auth=auth, order_size=args.size, start_A=start_value_A, start_B=start_value_B, start_ex=start_ex) 
