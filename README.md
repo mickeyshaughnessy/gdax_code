@@ -19,3 +19,10 @@
   'LTC' : 2.0
   }
 ```
+
+
+to do:
+  * define data format / recording info
+  * auto-restart in main loop
+  * output better performance metrics in realtime
+  

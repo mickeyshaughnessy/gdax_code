@@ -23,14 +23,12 @@ def get_total_balance(auth=None):
     return balance, balances
 
 def get_position(product='ETH', auth=None):
-    #r = requests.get(base_url + '/postions/', auth=auth) 
     r = requests.get(base_url + '/accounts/', auth=auth) 
     resp = r.json()
     target = {}
     for c in resp:
         if c.get('currency') == product:
             target = c
-    #print 'position: %s' % target
     if target:
         return float(target.get('hold', 0.0))
     else:
@@ -64,13 +62,14 @@ def get_bid_ask(product='ETH-USD'):
     ask = float(resp.json()['asks'][0][0])
     return bid, ask
 
-def get_buy_sell(product='ETH-USD', spread_factor=5.8, noise=0.1):
+def get_buy_sell(product='ETH-USD', spread_factor=2.0, noise=0.1):
     # spread_factor: How big to make mySpread relative to the market
     # noise: noisy additional spread
     gdax_bid, gdax_ask = get_bid_ask(product=product)
     gdax_spread = gdax_ask - gdax_bid
     buy_price = gdax_bid - 0.5 * gdax_spread * (spread_factor + noise * random.random())
     sell_price = gdax_ask + 0.5 * gdax_spread * (spread_factor + noise * random.random())
+    #if random.random() < 0.5: buy_price = sell_price - 0.01
     return (buy_price, sell_price)
 
 def is_unbalanced(auth=None, product='LTC-USD'):
@@ -120,8 +119,8 @@ def make_market(product='ETH-USD', auth=None, order_size=0.25, start_A=0, start_
         print 'change in %s: %s, change in %s: %s, total_earnings: %s' % (A, balances[A] * start_ex - start_A, B, balances[B] - start_B, balances[A] * start_ex  - start_A + balances[B] - start_B)
         sleep(4)
         A_pos, B_pos = get_position(product=A, auth=auth), get_position(product=B, auth=auth)
-        if random.random() < 0.08: cancel_product(product=product, auth=auth)
-        if random.random() < 0.2: rebalance(auth=auth, product=product, )
+        if random.random() < 0.001: cancel_product(product=product, auth=auth)
+        #if random.random() < 0.2: rebalance(auth=auth, product=product, )
         buy_price, sell_price = get_buy_sell(product=product)
         print '%s_at_risk = %s, %s_at_risk = %s, mySpread = %s' % (
             A, A_pos, B, B_pos, sell_price - buy_price 
@@ -160,7 +159,6 @@ if __name__ == "__main__":
     (A, B) = args.product.split('-')[-2:]
     _, balances = get_total_balance(auth=auth)
     print "Balances: %s" % balances
-    raw_input()
     start_ex = get_usd_ex(A)
     start_value_A, start_value_B = balances[A] * start_ex, balances[B] 
     make_market(product=args.product, auth=auth, order_size=args.size, start_A=start_value_A, start_B=start_value_B, start_ex=start_ex) 
