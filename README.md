@@ -1,5 +1,11 @@
- This repo has a simple interface to the GDAX trading
+ This repo has a simple interface to the GDAX (Coinbase) trading
  platform for trading cryptocurrencies.
+
+It also has a simple market-making bot script, which can be run continually to make a (very small) profit.
+
+* As of March 2019, the transaction fees make running the market maker unprofitable - use at your own risk. 
+
+-----------------------------------------
 
  It has tools for monitoring balances and accounts, for submitting orders, and for running a market maker.
 
@@ -22,7 +28,5 @@
 
 
 to do:
-  * define data format / recording info
   * auto-restart in main loop
-  * output better performance metrics in realtime
   
